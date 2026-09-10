@@ -1,0 +1,6 @@
+{
+  "name": "Zikr Tracker",
+  "description": "A modern, mobile-friendly Zikr and Tasbih counter with custom phrases, target goals, progress tracking, streaks, secure Admin Panel, and RBAC.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

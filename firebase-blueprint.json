@@ -1,0 +1,91 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile with cumulative counts, streak tracking, role, and preferences.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "user"] },
+        "totalCount": { "type": "number" },
+        "streak": { "type": "number" },
+        "bestStreak": { "type": "number" },
+        "lastActiveDate": { "type": "string" },
+        "dailyGoal": { "type": "number" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["userId", "email"]
+    },
+    "GlobalZikr": {
+      "title": "GlobalZikr",
+      "description": "Admin-managed public preset Zikr items.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "arabic": { "type": "string" },
+        "transliteration": { "type": "string" },
+        "translation": { "type": "string" },
+        "meaningNote": { "type": "string" },
+        "defaultTarget": { "type": "number" },
+        "category": { "type": "string", "enum": ["daily", "tasbih", "forgiveness", "custom"] },
+        "order": { "type": "number" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "transliteration", "arabic", "defaultTarget"]
+    },
+    "CustomZikr": {
+      "title": "CustomZikr",
+      "description": "User-defined custom Zikr phrases.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "arabic": { "type": "string" },
+        "transliteration": { "type": "string" },
+        "translation": { "type": "string" },
+        "defaultTarget": { "type": "number" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "transliteration"]
+    },
+    "HistoryEntry": {
+      "title": "HistoryEntry",
+      "description": "Recorded completed sessions or saved counts.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "zikrId": { "type": "string" },
+        "zikrTitle": { "type": "string" },
+        "arabic": { "type": "string" },
+        "count": { "type": "number" },
+        "target": { "type": "number" },
+        "timestamp": { "type": "number" },
+        "dateString": { "type": "string" }
+      },
+      "required": ["id", "userId", "count", "timestamp"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Stores user account profile information and statistics."
+    },
+    "users/{userId}/customZikrs/{zikrId}": {
+      "schema": "CustomZikr",
+      "description": "Stores user-specific custom Zikr items."
+    },
+    "users/{userId}/history/{historyId}": {
+      "schema": "HistoryEntry",
+      "description": "Stores user session history and recitation logs."
+    },
+    "globalZikrs/{zikrId}": {
+      "schema": "GlobalZikr",
+      "description": "Stores admin-managed global preset Zikr items."
+    }
+  }
+}

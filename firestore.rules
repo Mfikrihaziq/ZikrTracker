@@ -1,0 +1,53 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'mfhzaki@gmail.com' ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Users profile collection & subcollections
+    match /users/{userId} {
+      allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow list: if isAdmin();
+      allow create: if isSignedIn() && request.auth.uid == userId;
+      allow update: if isSignedIn() && (
+        isAdmin() ||
+        (request.auth.uid == userId &&
+         (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role'])))
+      );
+      allow delete: if isAdmin();
+
+      match /customZikrs/{zikrId} {
+        allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      }
+
+      match /history/{historyId} {
+        allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      }
+    }
+
+    // Global preset Zikrs collection managed by Admin
+    match /globalZikrs/{zikrId} {
+      allow get, list: if true;
+      allow create, update, delete: if isAdmin();
+    }
+  }
+}
+
