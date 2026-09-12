@@ -420,6 +420,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       console.error('Sign-in error:', err);
       if (err.code === 'auth/popup-blocked') {
         setAuthError('Sign-in popup was blocked by the browser. Please allow popups for this site.');
+      } else if (err.code === 'auth/unauthorized-domain') {
+        const host = typeof window !== 'undefined' ? window.location.hostname : '';
+        setAuthError(`auth/unauthorized-domain:${host}`);
       } else if (err.code !== 'auth/popup-closed-by-user') {
         setAuthError(err.message || 'Unable to sign in. Please try again.');
       }
