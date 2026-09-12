@@ -1,3 +1,5 @@
+export type TapSoundType = 'wood' | 'water' | 'bell' | 'click' | 'whisper' | 'none';
+
 export interface ZikrItem {
   id: string;
   arabic: string;
@@ -8,6 +10,8 @@ export interface ZikrItem {
   isCustom?: boolean;
   category?: 'daily' | 'tasbih' | 'forgiveness' | 'custom';
   order?: number;
+  audioUrl?: string; // Custom recitation MP3 / audio link
+  tapSound?: TapSoundType; // Custom bead click sound style
   createdAt?: string;
   updatedAt?: string;
 }

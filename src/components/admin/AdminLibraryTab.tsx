@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { ZikrItem } from '../../types';
 import { EditGlobalZikrModal } from './EditGlobalZikrModal';
+import { recitationPlayer, TAP_SOUND_OPTIONS } from '../../utils/audio';
 import {
   BookOpen,
   Plus,
@@ -13,6 +14,9 @@ import {
   CheckCircle2,
   RefreshCw,
   AlertTriangle,
+  Volume2,
+  Square,
+  Music,
 } from 'lucide-react';
 
 export const AdminLibraryTab: React.FC = () => {
@@ -31,6 +35,25 @@ export const AdminLibraryTab: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [reordering, setReordering] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [playingId, setPlayingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const unsub = recitationPlayer.subscribe((activeId) => {
+      setPlayingId(activeId);
+    });
+    return () => {
+      unsub();
+      recitationPlayer.stop();
+    };
+  }, []);
+
+  const handleToggleRecitation = (item: ZikrItem) => {
+    if (playingId === item.id) {
+      recitationPlayer.stop();
+    } else {
+      recitationPlayer.play(item);
+    }
+  };
 
   const filteredZikrs = globalZikrs.filter((z) => {
     const q = searchQuery.toLowerCase();
@@ -204,6 +227,17 @@ export const AdminLibraryTab: React.FC = () => {
                           {item.category}
                         </span>
                       )}
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-stone-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-stone-200 dark:border-slate-700 flex items-center gap-1">
+                        <Music className="w-2.5 h-2.5 text-emerald-600 dark:text-emerald-400" />
+                        <span>
+                          {TAP_SOUND_OPTIONS.find((s) => s.id === (item.tapSound || 'wood'))?.label || 'Wood'}
+                        </span>
+                      </span>
+                      {item.audioUrl && (
+                        <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-purple-50 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800/40">
+                          Custom MP3
+                        </span>
+                      )}
                     </div>
                     <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">
                       {item.translation}
@@ -225,6 +259,21 @@ export const AdminLibraryTab: React.FC = () => {
                   </div>
 
                   <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      onClick={() => handleToggleRecitation(item)}
+                      className={`p-2 rounded-xl transition-colors cursor-pointer ${
+                        playingId === item.id
+                          ? 'bg-emerald-600 text-white animate-pulse'
+                          : 'text-slate-600 dark:text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/50'
+                      }`}
+                      title={playingId === item.id ? 'Stop audio' : 'Listen recitation'}
+                    >
+                      {playingId === item.id ? (
+                        <Square className="w-4 h-4 fill-current" />
+                      ) : (
+                        <Volume2 className="w-4 h-4" />
+                      )}
+                    </button>
                     <button
                       onClick={() => handleOpenEdit(item)}
                       className="p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 transition-colors cursor-pointer"

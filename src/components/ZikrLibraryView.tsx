@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { ZikrItem } from '../types';
 import { AddCustomZikrModal } from './AddCustomZikrModal';
+import { recitationPlayer, TAP_SOUND_OPTIONS } from '../utils/audio';
 import {
   Search,
   Plus,
@@ -12,6 +13,9 @@ import {
   ArrowRight,
   Filter,
   ShieldCheck,
+  Volume2,
+  Square,
+  Music,
 } from 'lucide-react';
 
 interface ZikrLibraryViewProps {
@@ -25,6 +29,26 @@ export const ZikrLibraryView: React.FC<ZikrLibraryViewProps> = ({ onSelectZikr }
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'tasbih' | 'daily' | 'forgiveness' | 'custom'>('all');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [playingZikrId, setPlayingZikrId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const unsub = recitationPlayer.subscribe((activeId) => {
+      setPlayingZikrId(activeId);
+    });
+    return () => {
+      unsub();
+      recitationPlayer.stop();
+    };
+  }, []);
+
+  const handleToggleRecitation = (e: React.MouseEvent, item: ZikrItem) => {
+    e.stopPropagation();
+    if (playingZikrId === item.id) {
+      recitationPlayer.stop();
+    } else {
+      recitationPlayer.play(item);
+    }
+  };
 
   // Filter zikrs
   const filteredZikrs = allZikrs.filter((item) => {
@@ -238,10 +262,40 @@ export const ZikrLibraryView: React.FC<ZikrLibraryViewProps> = ({ onSelectZikr }
                   </p>
                 )}
 
-                {/* Select button footer */}
+                {/* Footer: Audio Recitation, Sound Style & Selection */}
                 <div className="mt-4 pt-3 border-t border-stone-100 dark:border-emerald-500/15 flex items-center justify-between text-xs font-semibold">
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={(e) => handleToggleRecitation(e, item)}
+                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-medium transition-all cursor-pointer ${
+                        playingZikrId === item.id
+                          ? 'bg-emerald-600 text-white animate-pulse shadow-xs'
+                          : 'bg-stone-100 dark:bg-[#1A232E] text-slate-700 dark:text-slate-300 hover:bg-emerald-50 hover:text-emerald-700 dark:hover:bg-emerald-950/60 dark:hover:text-emerald-300'
+                      }`}
+                      title={playingZikrId === item.id ? 'Stop audio' : 'Listen to recitation'}
+                    >
+                      {playingZikrId === item.id ? (
+                        <>
+                          <Square className="w-3 h-3 fill-current" />
+                          <span>Playing</span>
+                        </>
+                      ) : (
+                        <>
+                          <Volume2 className="w-3 h-3" />
+                          <span>Audio</span>
+                        </>
+                      )}
+                    </button>
+
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-500 dark:text-slate-400 bg-stone-100 dark:bg-[#1A232E] px-2 py-1 rounded-xl">
+                      <Music className="w-2.5 h-2.5 text-emerald-600 dark:text-emerald-400" />
+                      <span>{TAP_SOUND_OPTIONS.find((s) => s.id === (item.tapSound || 'wood'))?.label || 'Wood'}</span>
+                    </span>
+                  </div>
+
                   <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
-                    <span>{isActive ? 'Currently Counting' : 'Select for Tasbih'}</span>
+                    <span>{isActive ? 'Currently Counting' : 'Select'}</span>
                     <ArrowRight className="w-3.5 h-3.5" />
                   </span>
                 </div>

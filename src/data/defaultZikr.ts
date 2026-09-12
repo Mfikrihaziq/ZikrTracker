@@ -10,6 +10,7 @@ export const DEFAULT_ZIKRS: ZikrItem[] = [
     defaultTarget: 33,
     category: 'tasbih',
     isCustom: false,
+    tapSound: 'wood',
   },
   {
     id: 'alhamdulillah',
@@ -20,6 +21,7 @@ export const DEFAULT_ZIKRS: ZikrItem[] = [
     defaultTarget: 33,
     category: 'tasbih',
     isCustom: false,
+    tapSound: 'water',
   },
   {
     id: 'allahuakbar',
@@ -30,6 +32,7 @@ export const DEFAULT_ZIKRS: ZikrItem[] = [
     defaultTarget: 33,
     category: 'tasbih',
     isCustom: false,
+    tapSound: 'bell',
   },
   {
     id: 'astaghfirullah',
@@ -40,6 +43,7 @@ export const DEFAULT_ZIKRS: ZikrItem[] = [
     defaultTarget: 100,
     category: 'forgiveness',
     isCustom: false,
+    tapSound: 'whisper',
   },
   {
     id: 'lailahaillallah',
@@ -50,6 +54,7 @@ export const DEFAULT_ZIKRS: ZikrItem[] = [
     defaultTarget: 100,
     category: 'daily',
     isCustom: false,
+    tapSound: 'wood',
   },
   {
     id: 'subhanallahi-wa-bihamdihi',
@@ -60,6 +65,7 @@ export const DEFAULT_ZIKRS: ZikrItem[] = [
     defaultTarget: 100,
     category: 'daily',
     isCustom: false,
+    tapSound: 'water',
   },
   {
     id: 'lahawla',
@@ -70,6 +76,7 @@ export const DEFAULT_ZIKRS: ZikrItem[] = [
     defaultTarget: 33,
     category: 'daily',
     isCustom: false,
+    tapSound: 'click',
   },
   {
     id: 'salawat',
@@ -80,6 +87,7 @@ export const DEFAULT_ZIKRS: ZikrItem[] = [
     defaultTarget: 100,
     category: 'daily',
     isCustom: false,
+    tapSound: 'bell',
   },
   {
     id: 'hasbunallah',
@@ -90,6 +98,7 @@ export const DEFAULT_ZIKRS: ZikrItem[] = [
     defaultTarget: 33,
     category: 'daily',
     isCustom: false,
+    tapSound: 'wood',
   },
   {
     id: 'yahayyu-yaqayyum',
@@ -100,5 +109,6 @@ export const DEFAULT_ZIKRS: ZikrItem[] = [
     defaultTarget: 33,
     category: 'daily',
     isCustom: false,
+    tapSound: 'water',
   }
 ];

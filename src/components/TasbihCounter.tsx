@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
-import { soundManager } from '../utils/audio';
+import { soundManager, recitationPlayer, TAP_SOUND_OPTIONS } from '../utils/audio';
+import { TapSoundType } from '../types';
 import { triggerHaptic } from '../utils/haptics';
 import { CustomTargetModal } from './CustomTargetModal';
 import { DailyGoalModal } from './DailyGoalModal';
@@ -15,6 +16,11 @@ import {
   CheckCircle2,
   Sparkles,
   Target,
+  Volume2,
+  Square,
+  Music,
+  ChevronDown,
+  Check,
 } from 'lucide-react';
 
 interface TasbihCounterProps {
@@ -45,17 +51,50 @@ export const TasbihCounter: React.FC<TasbihCounterProps> = ({ onOpenLibrary }) =
   const [resetModalOpen, setResetModalOpen] = useState(false);
   const [milestoneCelebrated, setMilestoneCelebrated] = useState(false);
   const [ripples, setRipples] = useState<{ id: number; x: number; y: number }[]>([]);
+  const [isReciting, setIsReciting] = useState(false);
+  const [soundPickerOpen, setSoundPickerOpen] = useState(false);
 
   // Live calculation of today's total recitations including uncommitted taps
   const currentLiveTotalToday = todayTotalSaved + count;
   const hasReachedDailyGoal = dailyGoal > 0 && currentLiveTotalToday >= dailyGoal;
   const dailyProgressPct = dailyGoal > 0 ? Math.min(100, Math.round((currentLiveTotalToday / dailyGoal) * 100)) : 100;
 
-  // When active zikr changes, sync default target if user hasn't set custom
+  // When active zikr changes, sync default target if user hasn't set custom & stop recitation
   useEffect(() => {
     setTarget(activeZikr.defaultTarget || 33);
     setMilestoneCelebrated(false);
+    setSoundPickerOpen(false);
+    recitationPlayer.stop();
   }, [activeZikr.id]);
+
+  // Recitation player state subscription
+  useEffect(() => {
+    const unsub = recitationPlayer.subscribe((activeId) => {
+      setIsReciting(activeId === activeZikr.id);
+    });
+    return () => {
+      unsub();
+      recitationPlayer.stop();
+    };
+  }, [activeZikr.id]);
+
+  const toggleRecitation = () => {
+    if (isReciting) {
+      recitationPlayer.stop();
+    } else {
+      recitationPlayer.play(activeZikr);
+    }
+  };
+
+  const handleSelectTapSound = (soundType: TapSoundType) => {
+    soundManager.playTapSound(soundType);
+    setActiveZikr({ ...activeZikr, tapSound: soundType });
+    setSoundPickerOpen(false);
+    const chosen = TAP_SOUND_OPTIONS.find((s) => s.id === soundType);
+    if (chosen) {
+      showToast(`Bead sound set to ${chosen.label}`);
+    }
+  };
 
   // Round / Lap calculation
   const completedRounds = target > 0 ? Math.floor(count / target) : 0;
@@ -69,7 +108,7 @@ export const TasbihCounter: React.FC<TasbihCounterProps> = ({ onOpenLibrary }) =
     setCount(nextCount);
 
     if (soundEnabled) {
-      soundManager.playTapSound();
+      soundManager.playTapSound(activeZikr.tapSound || 'wood');
     }
     if (hapticEnabled) {
       triggerHaptic('tap');
@@ -98,6 +137,7 @@ export const TasbihCounter: React.FC<TasbihCounterProps> = ({ onOpenLibrary }) =
     dailyGoal,
     soundEnabled,
     hapticEnabled,
+    activeZikr.tapSound,
     triggerDailyGoalCelebration,
     showToast,
   ]);
@@ -271,42 +311,125 @@ export const TasbihCounter: React.FC<TasbihCounterProps> = ({ onOpenLibrary }) =
           >
             "{activeZikr.translation}"
           </p>
+
+          {/* Recitation Audio & Pronunciation Trigger */}
+          <div className="flex items-center justify-center gap-2 mt-3 mb-1">
+            <button
+              id="listen-recitation-btn"
+              type="button"
+              onClick={toggleRecitation}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer shadow-xs ${
+                isReciting
+                  ? 'bg-emerald-600 text-white animate-pulse ring-2 ring-emerald-400/40'
+                  : 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 border border-emerald-200/60 dark:border-emerald-800/50'
+              }`}
+              title={isReciting ? 'Stop recitation' : 'Listen to Arabic pronunciation & recitation'}
+            >
+              {isReciting ? (
+                <>
+                  <Square className="w-3.5 h-3.5 fill-current" />
+                  <span>Playing Recitation...</span>
+                </>
+              ) : (
+                <>
+                  <Volume2 className="w-3.5 h-3.5" />
+                  <span>Listen Recitation</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
 
-        {/* Target Goal Selector Pills */}
-        <div className="mt-4 pt-3 border-t border-stone-200/80 dark:border-emerald-500/15 flex items-center justify-between">
-          <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 font-medium">
-            <Target className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-            <span>Lap Goal:</span>
-          </div>
+        {/* Lap Goal & Bead Sound Selector */}
+        <div className="mt-4 pt-3 border-t border-stone-200/80 dark:border-emerald-500/15 space-y-2.5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 font-medium">
+              <Target className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span>Lap Goal:</span>
+            </div>
 
-          <div className="flex items-center gap-1.5">
-            {[33, 100].map((preset) => (
+            <div className="flex items-center gap-1.5">
+              {[33, 100].map((preset) => (
+                <button
+                  key={preset}
+                  id={`target-preset-${preset}`}
+                  onClick={() => setTarget(preset)}
+                  className={`px-3 py-1 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                    target === preset
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'bg-stone-100 dark:bg-[#1A232E] text-slate-600 dark:text-slate-400 hover:bg-stone-200 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  {preset}
+                </button>
+              ))}
+
               <button
-                key={preset}
-                id={`target-preset-${preset}`}
-                onClick={() => setTarget(preset)}
+                id="custom-goal-btn"
+                onClick={() => setGoalModalOpen(true)}
                 className={`px-3 py-1 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                  target === preset
+                  target !== 33 && target !== 100
                     ? 'bg-emerald-600 text-white shadow-xs'
                     : 'bg-stone-100 dark:bg-[#1A232E] text-slate-600 dark:text-slate-400 hover:bg-stone-200 dark:hover:bg-slate-700'
                 }`}
               >
-                {preset}
+                {target === 0 ? 'Open (∞)' : target !== 33 && target !== 100 ? `${target}` : 'Custom'}
               </button>
-            ))}
+            </div>
+          </div>
 
-            <button
-              id="custom-goal-btn"
-              onClick={() => setGoalModalOpen(true)}
-              className={`px-3 py-1 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                target !== 33 && target !== 100
-                  ? 'bg-emerald-600 text-white shadow-xs'
-                  : 'bg-stone-100 dark:bg-[#1A232E] text-slate-600 dark:text-slate-400 hover:bg-stone-200 dark:hover:bg-slate-700'
-              }`}
-            >
-              {target === 0 ? 'Open (∞)' : target !== 33 && target !== 100 ? `${target}` : 'Custom'}
-            </button>
+          {/* Bead Tap Sound Picker */}
+          <div className="flex items-center justify-between pt-1 border-t border-stone-100 dark:border-emerald-500/10">
+            <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 font-medium">
+              <Music className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span>Bead Sound:</span>
+            </div>
+
+            <div className="relative">
+              <button
+                id="bead-sound-picker-btn"
+                type="button"
+                onClick={() => setSoundPickerOpen(!soundPickerOpen)}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold bg-stone-100 dark:bg-[#1A232E] text-slate-700 dark:text-slate-300 hover:bg-stone-200 dark:hover:bg-slate-700 border border-stone-200/60 dark:border-emerald-500/20 transition-colors cursor-pointer"
+                title="Change bead tap click sound"
+              >
+                <span>
+                  {TAP_SOUND_OPTIONS.find((s) => s.id === (activeZikr.tapSound || 'wood'))?.label || 'Olive Wood'}
+                </span>
+                <ChevronDown className="w-3 h-3 text-slate-400" />
+              </button>
+
+              {soundPickerOpen && (
+                <div
+                  id="sound-picker-dropdown"
+                  className="absolute right-0 bottom-full mb-1.5 w-48 rounded-2xl bg-white dark:bg-[#121820] border border-stone-200 dark:border-emerald-500/25 shadow-xl p-1.5 z-40 animate-in fade-in zoom-in-95 duration-150"
+                >
+                  <p className="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    Bead Tap Sound
+                  </p>
+                  {TAP_SOUND_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => handleSelectTapSound(opt.id)}
+                      className={`w-full px-2.5 py-1.5 rounded-xl text-left text-xs flex items-center justify-between transition-colors cursor-pointer ${
+                        (activeZikr.tapSound || 'wood') === opt.id
+                          ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 font-bold'
+                          : 'text-slate-700 dark:text-slate-300 hover:bg-stone-100 dark:hover:bg-[#1A232E]'
+                      }`}
+                    >
+                      <div>
+                        <div className="font-semibold">{opt.label}</div>
+                        <div className="text-[10px] text-slate-400 font-normal">{opt.description}</div>
+                      </div>
+                      {(activeZikr.tapSound || 'wood') === opt.id && (
+                        <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0 ml-1" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
