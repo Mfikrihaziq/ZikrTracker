@@ -352,7 +352,6 @@ export function resolveZikrAudioUrl(zikrId: string, rawAudioUrl?: string): strin
   // Reject web page links, legacy API paths, and non-audio pages
   const isInvalidUrl =
     trimmed.includes('everyayah.com') ||
-    trimmed.startsWith('/audio/') ||
     trimmed.includes('myinstants.com/en/instant') ||
     trimmed.includes('myinstants.com/instant') ||
     trimmed.includes('youtube.com') ||
@@ -362,10 +361,15 @@ export function resolveZikrAudioUrl(zikrId: string, rawAudioUrl?: string): strin
     return defaultMatch?.audioUrl;
   }
 
-  // For default 10 presets, require direct audio media or local assets
+  // For default presets, require direct audio media or local assets
   if (defaultMatch) {
     const isDirectAudio =
       trimmed.startsWith('/assets/') ||
+      trimmed.startsWith('assets/') ||
+      trimmed.startsWith('./assets/') ||
+      trimmed.startsWith('/audio/') ||
+      trimmed.startsWith('audio/') ||
+      trimmed.startsWith('./audio/') ||
       /\.(mp3|wav|ogg|m4a|aac)(\?.*)?$/i.test(trimmed);
     if (!isDirectAudio) {
       return defaultMatch.audioUrl;

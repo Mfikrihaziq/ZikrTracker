@@ -238,6 +238,68 @@ class SoundManager {
 
 type RecitationListener = (activeZikrId: string | null, isLoading: boolean, error: string | null) => void;
 
+/**
+ * Resolves a public asset path against the current deployment base URL.
+ * Handles GitHub Pages (https://<user>.github.io/<repo>/), Vite subpaths, and root domains.
+ */
+export function resolvePublicAssetUrl(rawUrl?: string): string {
+  if (!rawUrl) return '';
+  const trimmed = rawUrl.trim();
+  if (!trimmed) return '';
+
+  // Return full HTTP/HTTPS, blob, data URIs untouched
+  if (/^(https?:|\/\/|data:|blob:)/i.test(trimmed)) {
+    return trimmed;
+  }
+
+  // Strip leading slashes and relative dot prefixes
+  const cleanPath = trimmed.replace(/^(\.|\/)+/, '');
+
+  // 1. If Vite configured a non-root base URL (e.g., base: '/repo-name/' or base: './')
+  const viteBase = import.meta.env.BASE_URL;
+  if (viteBase && viteBase !== '/' && viteBase !== './') {
+    const prefix = viteBase.endsWith('/') ? viteBase : `${viteBase}/`;
+    return `${prefix}${cleanPath}`;
+  }
+
+  // 2. Runtime browser path auto-detection:
+  // Detect GitHub Pages (e.g. https://username.github.io/my-tasbih/) or sub-paths
+  if (typeof window !== 'undefined' && window.location) {
+    const hostname = window.location.hostname;
+    const pathname = window.location.pathname;
+
+    if (hostname.endsWith('github.io')) {
+      const segments = pathname.split('/').filter(Boolean);
+      if (segments.length > 0 && !segments[0].includes('.') && segments[0] !== 'assets' && segments[0] !== 'audio') {
+        const repoName = segments[0];
+        return `/${repoName}/${cleanPath}`;
+      }
+    }
+
+    // General sub-path check (e.g. hosted under /subdirectory/)
+    const segments = pathname.split('/').filter(Boolean);
+    if (segments.length > 1 && !segments[0].includes('.') && segments[0] !== 'assets' && segments[0] !== 'audio' && segments[0] !== 'api') {
+      return `/${segments[0]}/${cleanPath}`;
+    }
+  }
+
+  return `/${cleanPath}`;
+}
+
+/**
+ * Returns alternative fallback URLs for built-in audio recitations
+ * (checks both /assets/aistudio/audio/ and /audio/recitations/).
+ */
+export function getAlternateAudioUrl(url: string): string | null {
+  if (url.includes('/assets/aistudio/audio/')) {
+    return url.replace('/assets/aistudio/audio/', '/audio/recitations/');
+  }
+  if (url.includes('/audio/recitations/')) {
+    return url.replace('/audio/recitations/', '/assets/aistudio/audio/');
+  }
+  return null;
+}
+
 // Recitation Player for Arabic pronunciation and custom audio MP3s
 class RecitationPlayer {
   private currentAudio: HTMLAudioElement | null = null;
@@ -274,12 +336,26 @@ class RecitationPlayer {
       return;
     }
 
+    const resolvedUrl = resolvePublicAssetUrl(targetUrl);
+
     try {
-      let audio = this.tapAudioCache.get(targetUrl);
+      let audio = this.tapAudioCache.get(resolvedUrl);
       if (!audio) {
-        audio = new Audio(targetUrl);
+        audio = new Audio(resolvedUrl);
         audio.preload = 'auto';
-        this.tapAudioCache.set(targetUrl, audio);
+        this.tapAudioCache.set(resolvedUrl, audio);
+
+        audio.onerror = () => {
+          const alt = getAlternateAudioUrl(resolvedUrl);
+          if (alt && audio) {
+            audio.src = resolvePublicAssetUrl(alt);
+            audio.play().catch(() => {
+              soundManager.playTapSound('wood');
+            });
+          } else {
+            soundManager.playTapSound('wood');
+          }
+        };
       }
       audio.currentTime = 0;
       audio.play().catch(() => {
@@ -392,11 +468,15 @@ class RecitationPlayer {
     }
 
     if (targetSrc) {
+      const resolvedSrc = resolvePublicAssetUrl(targetSrc);
+      const defaultResolvedSrc = defaultMatch?.audioUrl ? resolvePublicAssetUrl(defaultMatch.audioUrl) : undefined;
+      const altSrc = getAlternateAudioUrl(resolvedSrc);
+
       try {
         const audio = new Audio();
         this.currentAudio = audio;
         audio.preload = 'auto';
-        audio.src = targetSrc;
+        audio.src = resolvedSrc;
 
         audio.oncanplaythrough = () => {
           if (this.activeZikrId === zikr.id) {
@@ -416,15 +496,28 @@ class RecitationPlayer {
           cleanup();
         };
 
+        let hasTriedAlternate = false;
+
         audio.onerror = () => {
-          if (defaultMatch?.audioUrl && targetSrc !== defaultMatch.audioUrl) {
-            console.warn('Custom audio failed, retrying default bundled audio for:', zikr.id);
-            audio.src = defaultMatch.audioUrl;
+          if (!hasTriedAlternate && altSrc) {
+            hasTriedAlternate = true;
+            console.warn('Retrying with alternative audio path:', altSrc);
+            audio.src = resolvePublicAssetUrl(altSrc);
             audio.play().catch(() => {
               this.fallbackSpeech(zikr.arabic, cleanup, handleFail);
             });
             return;
           }
+
+          if (defaultResolvedSrc && resolvedSrc !== defaultResolvedSrc) {
+            console.warn('Custom audio failed, retrying default bundled audio for:', zikr.id);
+            audio.src = defaultResolvedSrc;
+            audio.play().catch(() => {
+              this.fallbackSpeech(zikr.arabic, cleanup, handleFail);
+            });
+            return;
+          }
+
           console.warn('Audio link failed, falling back to speech synthesis for:', zikr.arabic);
           this.fallbackSpeech(zikr.arabic, cleanup, handleFail);
         };
@@ -440,8 +533,16 @@ class RecitationPlayer {
             })
             .catch((err) => {
               console.warn('Audio element play error:', err);
-              if (defaultMatch?.audioUrl && targetSrc !== defaultMatch.audioUrl) {
-                audio.src = defaultMatch.audioUrl;
+              if (!hasTriedAlternate && altSrc) {
+                hasTriedAlternate = true;
+                audio.src = resolvePublicAssetUrl(altSrc);
+                audio.play().catch(() => {
+                  this.fallbackSpeech(zikr.arabic, cleanup, handleFail);
+                });
+                return;
+              }
+              if (defaultResolvedSrc && resolvedSrc !== defaultResolvedSrc) {
+                audio.src = defaultResolvedSrc;
                 audio.play().catch(() => {
                   this.fallbackSpeech(zikr.arabic, cleanup, handleFail);
                 });

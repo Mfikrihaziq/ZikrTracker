@@ -6,3 +6,11 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Static assets and audio recitations
+!public/
+!public/assets/
+!public/assets/**
+!public/audio/
+!public/audio/**
+!*.mp3
