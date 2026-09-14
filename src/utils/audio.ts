@@ -1,7 +1,9 @@
 import { TapSoundType, ZikrItem } from '../types';
+import { DEFAULT_ZIKRS } from '../data/defaultZikr';
 
 export const TAP_SOUND_OPTIONS: { id: TapSoundType; label: string; description: string }[] = [
   { id: 'wood', label: 'Olive Wood', description: 'Traditional warm olive wood bead' },
+  { id: 'voice', label: 'Voice Recitation', description: 'Recites the phrase audio on each tap' },
   { id: 'water', label: 'Water Drop', description: 'Serene crystal water droplet' },
   { id: 'bell', label: 'Gentle Bell', description: 'Resonant singing meditation chime' },
   { id: 'click', label: 'Tally Clicker', description: 'Crisp mechanical counter click' },
@@ -158,50 +160,53 @@ class SoundManager {
         osc.type = 'sine';
         osc.frequency.setValueAtTime(freq, ctx.currentTime + idx * 0.08);
 
-        const startTime = ctx.currentTime + idx * 0.08;
-        gain.gain.setValueAtTime(0.001, startTime);
-        gain.gain.linearRampToValueAtTime(0.25, startTime + 0.02);
-        gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.45);
+        gain.gain.setValueAtTime(0.15, ctx.currentTime + idx * 0.08);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + idx * 0.08 + 0.5);
 
         osc.connect(gain);
         gain.connect(ctx.destination);
 
+        const startTime = ctx.currentTime + idx * 0.08;
         osc.start(startTime);
-        osc.stop(startTime + 0.5);
+        osc.stop(startTime + 0.55);
       });
     } catch {
       // Ignore audio failures
     }
   }
 
-  // Uplifting celebration chime when completing daily Zikr target goal
-  playDailyGoalCelebrationChime() {
+  // Grand celebration fanfare on completing entire daily goal
+  playDailyCompletionFanfare() {
     const ctx = this.getContext();
     if (!ctx) return;
 
     try {
-      const notes = [523.25, 587.33, 659.25, 783.99, 880.0, 1046.5];
-      notes.forEach((freq, idx) => {
+      const chord = [523.25, 659.25, 783.99, 1046.50, 1318.51]; // C major chord
+      chord.forEach((freq, idx) => {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
 
-        osc.type = 'sine';
-        const startTime = ctx.currentTime + idx * 0.07;
-        osc.frequency.setValueAtTime(freq, startTime);
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, ctx.currentTime + idx * 0.06);
 
-        gain.gain.setValueAtTime(0.001, startTime);
-        gain.gain.linearRampToValueAtTime(0.22, startTime + 0.03);
-        gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.65);
+        gain.gain.setValueAtTime(0.2, ctx.currentTime + idx * 0.06);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + idx * 0.06 + 0.65);
 
         osc.connect(gain);
         gain.connect(ctx.destination);
 
+        const startTime = ctx.currentTime + idx * 0.06;
         osc.start(startTime);
         osc.stop(startTime + 0.7);
       });
     } catch {
       // Ignore audio failures
     }
+  }
+
+  // Alias for daily celebration chime
+  playDailyGoalCelebrationChime() {
+    this.playDailyCompletionFanfare();
   }
 
   // Soft subtle reset tone
@@ -231,13 +236,61 @@ class SoundManager {
   }
 }
 
+type RecitationListener = (activeZikrId: string | null, isLoading: boolean, error: string | null) => void;
+
 // Recitation Player for Arabic pronunciation and custom audio MP3s
 class RecitationPlayer {
   private currentAudio: HTMLAudioElement | null = null;
+  private currentUtterance: SpeechSynthesisUtterance | null = null;
   private activeZikrId: string | null = null;
-  private listeners: Set<(activeZikrId: string | null) => void> = new Set();
+  private isLoading: boolean = false;
+  private lastError: string | null = null;
+  private listeners: Set<RecitationListener> = new Set();
+  private arabicVoicesLoaded: boolean = false;
+  private tapAudioCache: Map<string, HTMLAudioElement> = new Map();
 
-  subscribe(listener: (activeZikrId: string | null) => void) {
+  constructor() {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.onvoiceschanged = () => {
+        this.arabicVoicesLoaded = true;
+      };
+    }
+  }
+
+  playTapAudio(zikr: Pick<ZikrItem, 'id' | 'arabic' | 'audioUrl'>) {
+    const defaultMatch = DEFAULT_ZIKRS.find((d) => d.id === zikr.id);
+    let targetUrl = zikr.audioUrl?.trim();
+    if (
+      !targetUrl ||
+      targetUrl.includes('myinstants.com/en/instant') ||
+      targetUrl.includes('myinstants.com/instant') ||
+      targetUrl.includes('everyayah.com') ||
+      targetUrl.startsWith('/audio/')
+    ) {
+      targetUrl = defaultMatch?.audioUrl;
+    }
+    if (!targetUrl) {
+      soundManager.playTapSound('wood');
+      return;
+    }
+
+    try {
+      let audio = this.tapAudioCache.get(targetUrl);
+      if (!audio) {
+        audio = new Audio(targetUrl);
+        audio.preload = 'auto';
+        this.tapAudioCache.set(targetUrl, audio);
+      }
+      audio.currentTime = 0;
+      audio.play().catch(() => {
+        soundManager.playTapSound('wood');
+      });
+    } catch {
+      soundManager.playTapSound('wood');
+    }
+  }
+
+  subscribe(listener: RecitationListener) {
     this.listeners.add(listener);
     return () => {
       this.listeners.delete(listener);
@@ -245,11 +298,19 @@ class RecitationPlayer {
   }
 
   private notify() {
-    this.listeners.forEach((fn) => fn(this.activeZikrId));
+    this.listeners.forEach((fn) => fn(this.activeZikrId, this.isLoading, this.lastError));
   }
 
   getActiveZikrId(): string | null {
     return this.activeZikrId;
+  }
+
+  getIsLoading(): boolean {
+    return this.isLoading;
+  }
+
+  getLastError(): string | null {
+    return this.lastError;
   }
 
   isPlaying(zikrId?: string): boolean {
@@ -262,6 +323,7 @@ class RecitationPlayer {
       try {
         this.currentAudio.pause();
         this.currentAudio.currentTime = 0;
+        this.currentAudio.src = '';
       } catch {}
       this.currentAudio = null;
     }
@@ -270,15 +332,18 @@ class RecitationPlayer {
       try {
         window.speechSynthesis.cancel();
       } catch {}
+      this.currentUtterance = null;
     }
 
     this.activeZikrId = null;
+    this.isLoading = false;
     this.notify();
   }
 
   play(
     zikr: Pick<ZikrItem, 'id' | 'arabic' | 'transliteration' | 'audioUrl'>,
-    onFinish?: () => void
+    onFinish?: () => void,
+    onError?: (err: string) => void
   ) {
     // If currently reciting this exact phrase, toggle off
     if (this.activeZikrId === zikr.id) {
@@ -290,66 +355,177 @@ class RecitationPlayer {
     this.stop();
 
     this.activeZikrId = zikr.id;
+    this.isLoading = true;
+    this.lastError = null;
     this.notify();
 
     const cleanup = () => {
       if (this.activeZikrId === zikr.id) {
         this.activeZikrId = null;
+        this.isLoading = false;
         this.notify();
         if (onFinish) onFinish();
       }
     };
 
-    // 1. If custom MP3 / audio link is provided, play high-quality audio element
-    if (zikr.audioUrl && zikr.audioUrl.trim()) {
+    const handleFail = (msg: string) => {
+      if (this.activeZikrId === zikr.id) {
+        this.lastError = msg;
+        this.isLoading = false;
+        this.activeZikrId = null;
+        this.notify();
+        if (onError) onError(msg);
+      }
+    };
+
+    // 1. If custom MP3 / audio link or default preset audio is provided, play high-quality audio element
+    const defaultMatch = DEFAULT_ZIKRS.find((d) => d.id === zikr.id);
+    let targetSrc = zikr.audioUrl?.trim();
+    if (
+      !targetSrc ||
+      targetSrc.includes('myinstants.com/en/instant') ||
+      targetSrc.includes('myinstants.com/instant') ||
+      targetSrc.includes('everyayah.com') ||
+      targetSrc.startsWith('/audio/')
+    ) {
+      targetSrc = defaultMatch?.audioUrl;
+    }
+
+    if (targetSrc) {
       try {
-        const audio = new Audio(zikr.audioUrl.trim());
+        const audio = new Audio();
         this.currentAudio = audio;
-        audio.onended = cleanup;
-        audio.onerror = () => {
-          // Fallback to speech synthesis if remote MP3 link fails
-          this.fallbackSpeech(zikr.arabic, cleanup);
+        audio.preload = 'auto';
+        audio.src = targetSrc;
+
+        audio.oncanplaythrough = () => {
+          if (this.activeZikrId === zikr.id) {
+            this.isLoading = false;
+            this.notify();
+          }
         };
-        audio.play().catch(() => {
-          this.fallbackSpeech(zikr.arabic, cleanup);
-        });
+
+        audio.onplaying = () => {
+          if (this.activeZikrId === zikr.id) {
+            this.isLoading = false;
+            this.notify();
+          }
+        };
+
+        audio.onended = () => {
+          cleanup();
+        };
+
+        audio.onerror = () => {
+          if (defaultMatch?.audioUrl && targetSrc !== defaultMatch.audioUrl) {
+            console.warn('Custom audio failed, retrying default bundled audio for:', zikr.id);
+            audio.src = defaultMatch.audioUrl;
+            audio.play().catch(() => {
+              this.fallbackSpeech(zikr.arabic, cleanup, handleFail);
+            });
+            return;
+          }
+          console.warn('Audio link failed, falling back to speech synthesis for:', zikr.arabic);
+          this.fallbackSpeech(zikr.arabic, cleanup, handleFail);
+        };
+
+        const playPromise = audio.play();
+        if (playPromise !== undefined) {
+          playPromise
+            .then(() => {
+              if (this.activeZikrId === zikr.id) {
+                this.isLoading = false;
+                this.notify();
+              }
+            })
+            .catch((err) => {
+              console.warn('Audio element play error:', err);
+              if (defaultMatch?.audioUrl && targetSrc !== defaultMatch.audioUrl) {
+                audio.src = defaultMatch.audioUrl;
+                audio.play().catch(() => {
+                  this.fallbackSpeech(zikr.arabic, cleanup, handleFail);
+                });
+                return;
+              }
+              this.fallbackSpeech(zikr.arabic, cleanup, handleFail);
+            });
+        }
         return;
-      } catch {
-        this.fallbackSpeech(zikr.arabic, cleanup);
+      } catch (err: any) {
+        console.warn('Could not initialize audio:', err);
+        this.fallbackSpeech(zikr.arabic, cleanup, handleFail);
         return;
       }
     }
 
     // 2. Native Arabic speech synthesis fallback for instant pronunciation
-    this.fallbackSpeech(zikr.arabic, cleanup);
+    this.fallbackSpeech(zikr.arabic, cleanup, handleFail);
   }
 
-  private fallbackSpeech(text: string, onEnd: () => void) {
+  private fallbackSpeech(
+    text: string,
+    onEnd: () => void,
+    onFail: (err: string) => void
+  ) {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
-      onEnd();
+      onFail('Speech audio is not supported in this browser.');
       return;
     }
 
     try {
       window.speechSynthesis.cancel();
+
+      // Check if paused and resume
+      if (window.speechSynthesis.paused) {
+        window.speechSynthesis.resume();
+      }
+
       const utterance = new SpeechSynthesisUtterance(text);
+      this.currentUtterance = utterance; // Prevent garbage collection bug in Chrome
       utterance.lang = 'ar-SA';
-      utterance.rate = 0.82; // Calming, clear pace for dhikr
+      utterance.rate = 0.82; // Calming pace for dhikr
       utterance.pitch = 1.0;
 
       // Select Arabic voice if available on user device
       const voices = window.speechSynthesis.getVoices();
-      const arabicVoice = voices.find((v) => v.lang.startsWith('ar'));
+      const arabicVoice =
+        voices.find((v) => v.lang.startsWith('ar')) ||
+        voices.find((v) => v.lang.includes('ar'));
+
       if (arabicVoice) {
         utterance.voice = arabicVoice;
+      } else if (!this.arabicVoicesLoaded && voices.length === 0) {
+        // Wait briefly for onvoiceschanged in Chromium
+        const voiceHandler = () => {
+          const updatedVoices = window.speechSynthesis.getVoices();
+          const av = updatedVoices.find((v) => v.lang.startsWith('ar'));
+          if (av) utterance.voice = av;
+        };
+        window.speechSynthesis.addEventListener('voiceschanged', voiceHandler, { once: true });
       }
 
-      utterance.onend = onEnd;
-      utterance.onerror = onEnd;
+      this.isLoading = false;
+      this.notify();
+
+      utterance.onend = () => {
+        this.currentUtterance = null;
+        onEnd();
+      };
+
+      utterance.onerror = (e) => {
+        this.currentUtterance = null;
+        console.warn('Speech synthesis error:', e);
+        if (!arabicVoice && !voices.some((v) => v.lang.startsWith('ar'))) {
+          onFail('No Arabic speech voice found on your device. Add an MP3 link in Edit Zikr to play recitations.');
+        } else {
+          onFail('Audio recitation was interrupted.');
+        }
+      };
 
       window.speechSynthesis.speak(utterance);
-    } catch {
-      onEnd();
+    } catch (err: any) {
+      console.error('Speech synthesis failure:', err);
+      onFail('Audio playback could not start.');
     }
   }
 }

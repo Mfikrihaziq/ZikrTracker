@@ -23,7 +23,7 @@ interface ZikrLibraryViewProps {
 }
 
 export const ZikrLibraryView: React.FC<ZikrLibraryViewProps> = ({ onSelectZikr }) => {
-  const { allZikrs, activeZikr, removeCustomZikr, isAdmin, setCurrentTab } = useApp();
+  const { allZikrs, activeZikr, removeCustomZikr, isAdmin, setCurrentTab, showToast } = useApp();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'tasbih' | 'daily' | 'forgiveness' | 'custom'>('all');
@@ -32,21 +32,28 @@ export const ZikrLibraryView: React.FC<ZikrLibraryViewProps> = ({ onSelectZikr }
   const [playingZikrId, setPlayingZikrId] = useState<string | null>(null);
 
   useEffect(() => {
-    const unsub = recitationPlayer.subscribe((activeId) => {
+    const unsub = recitationPlayer.subscribe((activeId, _loading, error) => {
       setPlayingZikrId(activeId);
+      if (activeId && error) {
+        showToast(error);
+      }
     });
     return () => {
       unsub();
       recitationPlayer.stop();
     };
-  }, []);
+  }, [showToast]);
 
   const handleToggleRecitation = (e: React.MouseEvent, item: ZikrItem) => {
     e.stopPropagation();
     if (playingZikrId === item.id) {
       recitationPlayer.stop();
     } else {
-      recitationPlayer.play(item);
+      recitationPlayer.play(
+        item,
+        undefined,
+        (err) => showToast(err)
+      );
     }
   };
 

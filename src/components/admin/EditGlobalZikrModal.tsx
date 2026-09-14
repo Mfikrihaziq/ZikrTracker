@@ -68,7 +68,11 @@ export const EditGlobalZikrModal: React.FC<EditGlobalZikrModalProps> = ({
         transliteration: transliteration.trim() || 'SubhanAllah',
         audioUrl: audioUrl.trim() || undefined,
       },
-      () => setIsTestingAudio(false)
+      () => setIsTestingAudio(false),
+      (errMsg) => {
+        setIsTestingAudio(false);
+        setError(errMsg);
+      }
     );
   };
 

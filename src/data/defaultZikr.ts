@@ -11,6 +11,7 @@ export const DEFAULT_ZIKRS: ZikrItem[] = [
     category: 'tasbih',
     isCustom: false,
     tapSound: 'wood',
+    audioUrl: '/assets/aistudio/audio/subhanallah.mp3',
   },
   {
     id: 'alhamdulillah',
@@ -22,6 +23,7 @@ export const DEFAULT_ZIKRS: ZikrItem[] = [
     category: 'tasbih',
     isCustom: false,
     tapSound: 'water',
+    audioUrl: '/assets/aistudio/audio/alhamdulillah.mp3',
   },
   {
     id: 'allahuakbar',
@@ -33,6 +35,7 @@ export const DEFAULT_ZIKRS: ZikrItem[] = [
     category: 'tasbih',
     isCustom: false,
     tapSound: 'bell',
+    audioUrl: '/assets/aistudio/audio/allahuakbar.mp3',
   },
   {
     id: 'astaghfirullah',
@@ -44,6 +47,7 @@ export const DEFAULT_ZIKRS: ZikrItem[] = [
     category: 'forgiveness',
     isCustom: false,
     tapSound: 'whisper',
+    audioUrl: '/assets/aistudio/audio/astaghfirullah.mp3',
   },
   {
     id: 'lailahaillallah',
@@ -55,17 +59,19 @@ export const DEFAULT_ZIKRS: ZikrItem[] = [
     category: 'daily',
     isCustom: false,
     tapSound: 'wood',
+    audioUrl: '/assets/aistudio/audio/lailahaillallah.mp3',
   },
   {
     id: 'subhanallahi-wa-bihamdihi',
-    arabic: 'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ ، سُبْحَانَ اللَّهِ الْعَظِيمِ',
-    transliteration: 'Subhanallahi wa bihamdihi, Subhanallahil Azeem',
-    translation: 'Glory be to Allah and His is the praise, Glory be to Allah the Tremendous',
-    meaningNote: 'Two phrases light on the tongue, heavy on the scale.',
+    arabic: 'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ',
+    transliteration: 'SubhanAllahi wa bihamdihi',
+    translation: 'Glory be to Allah and His is the praise',
+    meaningNote: 'Virtue of daily remembrance (100 times) wiping away shortcomings.',
     defaultTarget: 100,
     category: 'daily',
     isCustom: false,
     tapSound: 'water',
+    audioUrl: '/assets/aistudio/audio/subhanallahi-wa-bihamdihi.mp3',
   },
   {
     id: 'lahawla',
@@ -77,17 +83,7 @@ export const DEFAULT_ZIKRS: ZikrItem[] = [
     category: 'daily',
     isCustom: false,
     tapSound: 'click',
-  },
-  {
-    id: 'salawat',
-    arabic: 'اللَّهُمَّ صَلِّ عَلَىٰ سَيِّدِنَا مُحَمَّدٍ وَعَلَىٰ آلِهِ وَسَلِّمْ',
-    transliteration: 'Allahumma salli ala sayyidina Muhammad wa ala aalihi wa sallim',
-    translation: 'O Allah, bestow peace and blessings upon our Master Muhammad and his family',
-    meaningNote: 'Sending blessings upon the Messenger of Allah (peace be upon him).',
-    defaultTarget: 100,
-    category: 'daily',
-    isCustom: false,
-    tapSound: 'bell',
+    audioUrl: '/assets/aistudio/audio/lahawla.mp3',
   },
   {
     id: 'hasbunallah',
@@ -99,16 +95,6 @@ export const DEFAULT_ZIKRS: ZikrItem[] = [
     category: 'daily',
     isCustom: false,
     tapSound: 'wood',
+    audioUrl: '/assets/aistudio/audio/hasbunallah.mp3',
   },
-  {
-    id: 'yahayyu-yaqayyum',
-    arabic: 'يَا حَيُّ يَا قَيُّومُ بِرَحْمَتِكَ أَسْتَغِيثُ',
-    transliteration: 'Ya Hayyu Ya Qayyum, bi-rahmatika astagheeth',
-    translation: 'O Ever-Living, O Self-Sustaining, in Your mercy I seek relief',
-    meaningNote: 'Supplication for ease in hardship and guidance in affairs.',
-    defaultTarget: 33,
-    category: 'daily',
-    isCustom: false,
-    tapSound: 'water',
-  }
 ];

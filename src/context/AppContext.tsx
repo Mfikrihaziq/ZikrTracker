@@ -25,6 +25,7 @@ import {
   updateUserRole,
   getPlatformMetrics,
   seedDefaultGlobalZikrsIfEmpty,
+  repairDefaultGlobalZikrs,
 } from '../firebase/service';
 import { DEFAULT_ZIKRS } from '../data/defaultZikr';
 import { HistoryEntry, UserProfile, ZikrItem, PlatformMetrics } from '../types';
@@ -326,6 +327,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const items = await getGlobalZikrs();
       if (items && items.length > 0) {
         setGlobalZikrs(items);
+        setActiveZikr((curr) => {
+          const matched = items.find((it) => it.id === curr.id);
+          return matched ? { ...curr, ...matched } : items[0];
+        });
       }
     } catch (err) {
       console.warn('Could not load global presets:', err);
@@ -357,6 +362,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             seedDefaultGlobalZikrsIfEmpty().then((seeded) => {
               if (seeded && seeded.length > 0) setGlobalZikrs(seeded);
             }).catch(console.error);
+            repairDefaultGlobalZikrs().catch(console.error);
           }
 
           // Load remote custom zikrs & history

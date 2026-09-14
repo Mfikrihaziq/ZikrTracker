@@ -33,6 +33,8 @@
         "defaultTarget": { "type": "number" },
         "category": { "type": "string", "enum": ["daily", "tasbih", "forgiveness", "custom"] },
         "order": { "type": "number" },
+        "audioUrl": { "type": "string" },
+        "tapSound": { "type": "string" },
         "createdAt": { "type": "string" },
         "updatedAt": { "type": "string" }
       },

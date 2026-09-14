@@ -27,6 +27,7 @@ export const AdminLibraryTab: React.FC = () => {
     deleteGlobalPreset,
     reorderGlobalPresets,
     refreshGlobalPresets,
+    showToast,
   } = useApp();
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -38,20 +39,27 @@ export const AdminLibraryTab: React.FC = () => {
   const [playingId, setPlayingId] = useState<string | null>(null);
 
   useEffect(() => {
-    const unsub = recitationPlayer.subscribe((activeId) => {
+    const unsub = recitationPlayer.subscribe((activeId, _loading, error) => {
       setPlayingId(activeId);
+      if (activeId && error) {
+        showToast(error);
+      }
     });
     return () => {
       unsub();
       recitationPlayer.stop();
     };
-  }, []);
+  }, [showToast]);
 
   const handleToggleRecitation = (item: ZikrItem) => {
     if (playingId === item.id) {
       recitationPlayer.stop();
     } else {
-      recitationPlayer.play(item);
+      recitationPlayer.play(
+        item,
+        undefined,
+        (err) => showToast(err)
+      );
     }
   };
 

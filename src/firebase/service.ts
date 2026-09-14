@@ -341,6 +341,42 @@ export async function getPlatformMetrics(): Promise<PlatformMetrics> {
 // Global Zikr Library Management (Public Presets)
 // ----------------------------------------------------
 
+export function resolveZikrAudioUrl(zikrId: string, rawAudioUrl?: string): string | undefined {
+  const defaultMatch = DEFAULT_ZIKRS.find((def) => def.id === zikrId);
+  const trimmed = (rawAudioUrl || '').trim();
+
+  if (!trimmed) {
+    return defaultMatch?.audioUrl;
+  }
+
+  // Reject web page links, legacy API paths, and non-audio pages
+  const isInvalidUrl =
+    trimmed.includes('everyayah.com') ||
+    trimmed.startsWith('/audio/') ||
+    trimmed.includes('myinstants.com/en/instant') ||
+    trimmed.includes('myinstants.com/instant') ||
+    trimmed.includes('youtube.com') ||
+    trimmed.includes('youtu.be');
+
+  if (isInvalidUrl) {
+    return defaultMatch?.audioUrl;
+  }
+
+  // For default 10 presets, require direct audio media or local assets
+  if (defaultMatch) {
+    const isDirectAudio =
+      trimmed.startsWith('/assets/') ||
+      /\.(mp3|wav|ogg|m4a|aac)(\?.*)?$/i.test(trimmed);
+    if (!isDirectAudio) {
+      return defaultMatch.audioUrl;
+    }
+  }
+
+  return trimmed;
+}
+
+export const DEPRECATED_ZIKR_IDS = ['salawat', 'yahayyu-yaqayyum'];
+
 export async function getGlobalZikrs(): Promise<ZikrItem[]> {
   const path = 'globalZikrs';
   try {
@@ -357,7 +393,26 @@ export async function getGlobalZikrs(): Promise<ZikrItem[]> {
 
     const items: ZikrItem[] = [];
     snap.forEach((d) => {
-      items.push({ ...d.data(), id: d.id, isCustom: false } as ZikrItem);
+      // Exclude removed default zikrs
+      if (DEPRECATED_ZIKR_IDS.includes(d.id)) {
+        return;
+      }
+
+      const data = d.data() as Partial<ZikrItem>;
+      const defaultMatch = DEFAULT_ZIKRS.find((def) => def.id === d.id);
+      const audioUrl = resolveZikrAudioUrl(d.id, data.audioUrl);
+
+      items.push({
+        ...data,
+        id: d.id,
+        arabic: defaultMatch ? defaultMatch.arabic : (data.arabic || ''),
+        transliteration: defaultMatch ? defaultMatch.transliteration : (data.transliteration || ''),
+        translation: defaultMatch ? defaultMatch.translation : (data.translation || ''),
+        meaningNote: defaultMatch ? defaultMatch.meaningNote : (data.meaningNote || ''),
+        audioUrl,
+        tapSound: data.tapSound || defaultMatch?.tapSound || 'wood',
+        isCustom: false,
+      } as ZikrItem);
     });
 
     // Sort by order ascending
@@ -372,6 +427,57 @@ export async function getGlobalZikrs(): Promise<ZikrItem[]> {
   }
 }
 
+export async function repairDefaultGlobalZikrs(): Promise<void> {
+  try {
+    const zikrCol = collection(db, 'globalZikrs');
+    const snap = await getDocs(zikrCol);
+    if (snap.empty) return;
+
+    const batch = writeBatch(db);
+    let countToRepair = 0;
+
+    snap.forEach((d) => {
+      // Clean up deprecated presets from Firestore
+      if (DEPRECATED_ZIKR_IDS.includes(d.id)) {
+        const zikrRef = doc(db, 'globalZikrs', d.id);
+        batch.delete(zikrRef);
+        countToRepair++;
+        return;
+      }
+
+      const data = d.data() as Partial<ZikrItem>;
+      const defaultMatch = DEFAULT_ZIKRS.find((def) => def.id === d.id);
+      if (defaultMatch) {
+        const correctAudio = resolveZikrAudioUrl(d.id, data.audioUrl);
+        const needsUpdate =
+          data.audioUrl !== correctAudio ||
+          data.arabic !== defaultMatch.arabic ||
+          data.transliteration !== defaultMatch.transliteration;
+
+        if (needsUpdate) {
+          countToRepair++;
+          const zikrRef = doc(db, 'globalZikrs', d.id);
+          batch.update(zikrRef, {
+            arabic: defaultMatch.arabic,
+            transliteration: defaultMatch.transliteration,
+            translation: defaultMatch.translation,
+            meaningNote: defaultMatch.meaningNote,
+            audioUrl: correctAudio || defaultMatch.audioUrl,
+            updatedAt: new Date().toISOString(),
+          });
+        }
+      }
+    });
+
+    if (countToRepair > 0) {
+      await batch.commit();
+      console.log(`Repaired / cleaned up ${countToRepair} global zikr presets in Firestore`);
+    }
+  } catch (err) {
+    console.warn('Could not repair global zikrs (insufficient permission or offline):', err);
+  }
+}
+
 export async function seedDefaultGlobalZikrsIfEmpty(): Promise<ZikrItem[]> {
   try {
     const zikrCol = collection(db, 'globalZikrs');
@@ -379,7 +485,22 @@ export async function seedDefaultGlobalZikrsIfEmpty(): Promise<ZikrItem[]> {
     if (!snap.empty) {
       const items: ZikrItem[] = [];
       snap.forEach((d) => {
-        items.push({ ...d.data(), id: d.id, isCustom: false } as ZikrItem);
+        if (DEPRECATED_ZIKR_IDS.includes(d.id)) return;
+        const data = d.data() as Partial<ZikrItem>;
+        const defaultMatch = DEFAULT_ZIKRS.find((def) => def.id === d.id);
+        const audioUrl = resolveZikrAudioUrl(d.id, data.audioUrl);
+
+        items.push({
+          ...data,
+          id: d.id,
+          arabic: defaultMatch ? defaultMatch.arabic : (data.arabic || ''),
+          transliteration: defaultMatch ? defaultMatch.transliteration : (data.transliteration || ''),
+          translation: defaultMatch ? defaultMatch.translation : (data.translation || ''),
+          meaningNote: defaultMatch ? defaultMatch.meaningNote : (data.meaningNote || ''),
+          audioUrl,
+          tapSound: data.tapSound || defaultMatch?.tapSound || 'wood',
+          isCustom: false,
+        } as ZikrItem);
       });
       items.sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
       return items;

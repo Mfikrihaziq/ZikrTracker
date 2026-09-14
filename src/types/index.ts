@@ -1,4 +1,4 @@
-export type TapSoundType = 'wood' | 'water' | 'bell' | 'click' | 'whisper' | 'none';
+export type TapSoundType = 'wood' | 'water' | 'bell' | 'click' | 'whisper' | 'voice' | 'none';
 
 export interface ZikrItem {
   id: string;

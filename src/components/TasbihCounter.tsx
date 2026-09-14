@@ -21,6 +21,7 @@ import {
   Music,
   ChevronDown,
   Check,
+  Loader2,
 } from 'lucide-react';
 
 interface TasbihCounterProps {
@@ -52,6 +53,7 @@ export const TasbihCounter: React.FC<TasbihCounterProps> = ({ onOpenLibrary }) =
   const [milestoneCelebrated, setMilestoneCelebrated] = useState(false);
   const [ripples, setRipples] = useState<{ id: number; x: number; y: number }[]>([]);
   const [isReciting, setIsReciting] = useState(false);
+  const [isLoadingAudio, setIsLoadingAudio] = useState(false);
   const [soundPickerOpen, setSoundPickerOpen] = useState(false);
 
   // Live calculation of today's total recitations including uncommitted taps
@@ -69,25 +71,38 @@ export const TasbihCounter: React.FC<TasbihCounterProps> = ({ onOpenLibrary }) =
 
   // Recitation player state subscription
   useEffect(() => {
-    const unsub = recitationPlayer.subscribe((activeId) => {
-      setIsReciting(activeId === activeZikr.id);
+    const unsub = recitationPlayer.subscribe((activeId, loading, error) => {
+      const isCurrent = activeId === activeZikr.id;
+      setIsReciting(isCurrent);
+      setIsLoadingAudio(isCurrent && loading);
+      if (isCurrent && error) {
+        showToast(error);
+      }
     });
     return () => {
       unsub();
       recitationPlayer.stop();
     };
-  }, [activeZikr.id]);
+  }, [activeZikr.id, showToast]);
 
   const toggleRecitation = () => {
     if (isReciting) {
       recitationPlayer.stop();
     } else {
-      recitationPlayer.play(activeZikr);
+      recitationPlayer.play(
+        activeZikr,
+        undefined,
+        (err) => showToast(err)
+      );
     }
   };
 
   const handleSelectTapSound = (soundType: TapSoundType) => {
-    soundManager.playTapSound(soundType);
+    if (soundType === 'voice') {
+      recitationPlayer.playTapAudio(activeZikr);
+    } else {
+      soundManager.playTapSound(soundType);
+    }
     setActiveZikr({ ...activeZikr, tapSound: soundType });
     setSoundPickerOpen(false);
     const chosen = TAP_SOUND_OPTIONS.find((s) => s.id === soundType);
@@ -108,7 +123,11 @@ export const TasbihCounter: React.FC<TasbihCounterProps> = ({ onOpenLibrary }) =
     setCount(nextCount);
 
     if (soundEnabled) {
-      soundManager.playTapSound(activeZikr.tapSound || 'wood');
+      if (activeZikr.tapSound === 'voice') {
+        recitationPlayer.playTapAudio(activeZikr);
+      } else {
+        soundManager.playTapSound(activeZikr.tapSound || 'wood');
+      }
     }
     if (hapticEnabled) {
       triggerHaptic('tap');
@@ -137,6 +156,8 @@ export const TasbihCounter: React.FC<TasbihCounterProps> = ({ onOpenLibrary }) =
     dailyGoal,
     soundEnabled,
     hapticEnabled,
+    activeZikr.id,
+    activeZikr.audioUrl,
     activeZikr.tapSound,
     triggerDailyGoalCelebration,
     showToast,
@@ -313,29 +334,54 @@ export const TasbihCounter: React.FC<TasbihCounterProps> = ({ onOpenLibrary }) =
           </p>
 
           {/* Recitation Audio & Pronunciation Trigger */}
-          <div className="flex items-center justify-center gap-2 mt-3 mb-1">
+          <div className="flex items-center justify-center flex-wrap gap-2 mt-3 mb-1">
             <button
               id="listen-recitation-btn"
               type="button"
               onClick={toggleRecitation}
+              disabled={isLoadingAudio}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer shadow-xs ${
-                isReciting
+                isLoadingAudio
+                  ? 'bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-700 opacity-90'
+                  : isReciting
                   ? 'bg-emerald-600 text-white animate-pulse ring-2 ring-emerald-400/40'
                   : 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 border border-emerald-200/60 dark:border-emerald-800/50'
               }`}
-              title={isReciting ? 'Stop recitation' : 'Listen to Arabic pronunciation & recitation'}
+              title={isLoadingAudio ? 'Loading recitation audio...' : isReciting ? 'Stop recitation' : 'Listen to Mishary Alafasy reciting this exact phrase'}
             >
-              {isReciting ? (
+              {isLoadingAudio ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Loading Audio...</span>
+                </>
+              ) : isReciting ? (
                 <>
                   <Square className="w-3.5 h-3.5 fill-current" />
-                  <span>Playing Recitation...</span>
+                  <span>Playing (Mishary)</span>
                 </>
               ) : (
                 <>
                   <Volume2 className="w-3.5 h-3.5" />
-                  <span>Listen Recitation</span>
+                  <span>Audio Recitation (Mishary)</span>
                 </>
               )}
+            </button>
+
+            <button
+              id="toggle-voice-on-tap-btn"
+              type="button"
+              onClick={() => {
+                const newSound = activeZikr.tapSound === 'voice' ? 'wood' : 'voice';
+                handleSelectTapSound(newSound);
+              }}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer shadow-xs border ${
+                activeZikr.tapSound === 'voice'
+                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-emerald-500/20'
+                  : 'bg-stone-50 dark:bg-[#1A232E] text-slate-600 dark:text-slate-400 border-stone-200/80 dark:border-slate-800 hover:bg-stone-100 dark:hover:bg-slate-800'
+              }`}
+              title={activeZikr.tapSound === 'voice' ? 'Voice recitation plays on each bead tap. Click to switch to wood bead sound.' : 'Enable voice recitation audio on each bead tap'}
+            >
+              <span>{activeZikr.tapSound === 'voice' ? 'Voice on Tap: ON' : 'Voice on Tap'}</span>
             </button>
           </div>
         </div>
